@@ -1,6 +1,16 @@
 package com.rarchives.ripme.ripper;
 
-import java.awt.Desktop;
+import com.rarchives.ripme.App;
+import com.rarchives.ripme.ui.RipStatusComplete;
+import com.rarchives.ripme.ui.RipStatusHandler;
+import com.rarchives.ripme.ui.RipStatusMessage;
+import com.rarchives.ripme.ui.RipStatusMessage.STATUS;
+import com.rarchives.ripme.utils.Utils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.jsoup.HttpStatusException;
+
+import java.awt.*;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -9,25 +19,16 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Observable;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import org.jsoup.HttpStatusException;
-import com.rarchives.ripme.App;
-import com.rarchives.ripme.ui.RipStatusComplete;
-import com.rarchives.ripme.ui.RipStatusHandler;
-import com.rarchives.ripme.ui.RipStatusMessage;
-import com.rarchives.ripme.ui.RipStatusMessage.STATUS;
-import com.rarchives.ripme.utils.Utils;
+import java.util.stream.Stream;
 
 public abstract class AbstractRipper
                 extends Observable
@@ -40,7 +41,7 @@ public abstract class AbstractRipper
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36";
 
     protected URL url;
-    protected File workingDir;
+    protected Path workingDir;
     DownloadThreadPool threadPool;
     RipStatusHandler observer = null;
 
@@ -316,41 +317,34 @@ public abstract class AbstractRipper
         }
         LOGGER.debug("url: " + url + ", prefix: " + prefix + ", subdirectory" + subdirectory + ", referrer: " + referrer + ", cookies: " + cookies + ", fileName: " + fileName);
         String saveAs = getFileName(url, fileName, extension);
-        File saveFileAs;
-        try {
-            if (!subdirectory.equals("")) {
-                subdirectory = Utils.filesystemSafe(subdirectory);
-                subdirectory = File.separator + subdirectory;
-            }
-            prefix = Utils.filesystemSanitized(prefix);
-            String topFolderName = workingDir.getCanonicalPath();
-            if (App.stringToAppendToFoldername != null) {
-                topFolderName = topFolderName + App.stringToAppendToFoldername;
-            }
-            saveFileAs = new File(
-                    topFolderName
-                    + subdirectory
-                    + File.separator
-                    + prefix
-                    + saveAs);
-        } catch (IOException e) {
-            LOGGER.error("[!] Error creating save file path for URL '" + url + "':", e);
-            return false;
+        Path saveFileAs;
+        if (subdirectory.equals("")) {
+            subdirectory = Utils.filesystemSafe(subdirectory);
         }
+        prefix = Utils.filesystemSanitized(prefix);
+        if (App.stringToAppendToFoldername != null) {
+            subdirectory = App.stringToAppendToFoldername + "/" + subdirectory;
+        }
+        saveFileAs = Paths.get(
+                workingDir.toAbsolutePath().toString()
+                , subdirectory
+                , prefix
+                , saveAs
+                );
         LOGGER.debug("Downloading " + url + " to " + saveFileAs);
-        if (!saveFileAs.getParentFile().exists()) {
-            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(saveFileAs.getParent()));
-            saveFileAs.getParentFile().mkdirs();
-        }
-        if (Utils.getConfigBoolean("remember.url_history", true) && !isThisATest()) {
-            LOGGER.info("Writing " + url.toExternalForm() + " to file");
-            try {
-                writeDownloadedURL(url.toExternalForm() + "\n");
-            } catch (IOException e) {
-                LOGGER.debug("Unable to write URL history file");
+        try {
+            if (!Files.exists(saveFileAs.getParent())) {
+                LOGGER.info("[+] Creating directory: " + Utils.removeCWD(saveFileAs.getParent()));
+                Files.createDirectory(saveFileAs.getParent());
             }
+            if (Utils.getConfigBoolean("remember.url_history", true) && !isThisATest()) {
+                LOGGER.info("Writing " + url.toExternalForm() + " to file");
+                writeDownloadedURL(url.toExternalForm() + "\n");
+            }
+        } catch (IOException e) {
+            LOGGER.debug("Unable to write URL history file");
         }
-        return addURLToDownload(url, saveFileAs.toPath(), referrer, cookies, getFileExtFromMIME);
+        return addURLToDownload(url, saveFileAs, referrer, cookies, getFileExtFromMIME);
     }
 
     protected boolean addURLToDownload(URL url, String prefix, String subdirectory, String referrer, Map<String,String> cookies, String fileName, String extension) {
@@ -487,7 +481,7 @@ public abstract class AbstractRipper
             completed = true;
             LOGGER.info("   Rip completed!");
 
-            RipStatusComplete rsc = new RipStatusComplete(workingDir.toPath(), getCount());
+            RipStatusComplete rsc = new RipStatusComplete(workingDir, getCount());
             RipStatusMessage msg = new RipStatusMessage(STATUS.RIP_COMPLETE, rsc);
             observer.update(this, msg);
 
@@ -524,7 +518,7 @@ public abstract class AbstractRipper
      *      ripped via this ripper will be stored.
      */
     public File getWorkingDir() {
-        return workingDir;
+        return workingDir.toFile();
     }
 
     @Override
@@ -639,16 +633,15 @@ public abstract class AbstractRipper
      * Tries to delete any empty directories
      */
     private void cleanup() {
-        if (this.workingDir.list().length == 0) {
-            // No files, delete the dir
-            LOGGER.info("Deleting empty directory " + this.workingDir);
-            boolean deleteResult = this.workingDir.delete();
-            if (!deleteResult) {
-                LOGGER.error("Unable to delete empty directory " +  this.workingDir);
+        try (Stream<Path> entries = Files.list(this.workingDir)) {
+            if (!entries.findFirst().isPresent()) {
+                Files.delete(this.workingDir);
             }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
-    
+
     /**
      * Pauses thread for a set amount of time.
      * @param milliseconds

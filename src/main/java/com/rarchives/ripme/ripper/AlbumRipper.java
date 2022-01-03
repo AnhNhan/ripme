@@ -108,7 +108,7 @@ public abstract class AlbumRipper extends AbstractRipper {
      * @return
      *      True on success
      */
-    protected boolean addURLToDownload(URL url) {
+    protected boolean addURLToDownload(URL url) throws IOException {
         // Use empty prefix and empty subdirectory
         return addURLToDownload(url, "", "");
     }
@@ -188,12 +188,8 @@ public abstract class AlbumRipper extends AbstractRipper {
      */
     @Override
     public void setWorkingDir(URL url) throws IOException {
-        Path wd = Utils.getWorkingDirectory();
-        // TODO - change to nio
-        String path = wd.toAbsolutePath().toString();
-        if (!path.endsWith(File.separator)) {
-            path += File.separator;
-        }
+        this.workingDir = Utils.getWorkingDirectory();
+
         String title;
         if (Utils.getConfigBoolean("album_titles.save", true)) {
             title = getAlbumTitle(this.url);
@@ -202,14 +198,13 @@ public abstract class AlbumRipper extends AbstractRipper {
         }
         LOGGER.debug("Using album title '" + title + "'");
 
-        title = Utils.filesystemSafe(title);
-        path += title;
-        path = Utils.getOriginalDirectory(path) + File.separator;   // check for case sensitive (unix only)
+        title = workingDir.toAbsolutePath() + "/" + Utils.filesystemSafe(title);
+        title = Utils.getOriginalDirectory(title);   // check for case sensitive (unix only)
+        workingDir = workingDir.resolve(title);
 
-        this.workingDir = new File(path);
-        if (!this.workingDir.exists()) {
-            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(this.workingDir.toPath()));
-            this.workingDir.mkdirs();
+        if (!Files.exists(workingDir)) {
+            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(this.workingDir));
+            Files.createDirectory(workingDir);
         }
         LOGGER.debug("Set working directory to: " + this.workingDir);
     }

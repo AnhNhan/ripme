@@ -1,9 +1,15 @@
 package com.rarchives.ripme.ripper;
 
+import com.rarchives.ripme.ui.MainWindow;
+import com.rarchives.ripme.ui.RipStatusMessage;
+import com.rarchives.ripme.ui.RipStatusMessage.STATUS;
+import com.rarchives.ripme.utils.Utils;
+import org.jsoup.nodes.Document;
+
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -16,13 +22,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.jsoup.nodes.Document;
-
-import com.rarchives.ripme.ui.RipStatusMessage.STATUS;
-import com.rarchives.ripme.utils.Utils;
-import com.rarchives.ripme.ui.MainWindow;
-import com.rarchives.ripme.ui.RipStatusMessage;
 
 /**
  * Simplified ripper, designed for ripping from sites by parsing HTML.
@@ -44,11 +43,11 @@ public abstract class AbstractHTMLRipper extends AbstractRipper {
     public Document getNextPage(Document doc) throws IOException {
         return null;
     }
-    protected abstract List<String> getURLsFromPage(Document page);
+    protected abstract List<String> getURLsFromPage(Document page) throws IOException;
     protected List<String> getDescriptionsFromPage(Document doc) throws IOException {
         throw new IOException("getDescriptionsFromPage not implemented"); // Do I do this or make an abstract function?
     }
-    protected abstract void downloadURL(URL url, int index);
+    protected abstract void downloadURL(URL url, int index) throws IOException;
     protected DownloadThreadPool getThreadPool() {
         return null;
     }
@@ -161,13 +160,12 @@ public abstract class AbstractHTMLRipper extends AbstractRipper {
                         LOGGER.debug("Getting description from " + textURL);
                         String[] tempDesc = getDescription(textURL,doc);
                         if (tempDesc != null) {
-                            if (Utils.getConfigBoolean("file.overwrite", false) || !(new File(
-                                    workingDir.getCanonicalPath()
-                                            + ""
-                                            + File.separator
-                                            + getPrefix(index)
-                                            + (tempDesc.length > 1 ? tempDesc[1] : fileNameFromURL(new URL(textURL)))
-                                            + ".txt").exists())) {
+                            if (Utils.getConfigBoolean("file.overwrite", false) || !(Files.exists(
+                                    workingDir
+                                            .relativize(Paths.get(getPrefix(index)))
+                                            .relativize((tempDesc.length > 1 ? Paths.get(tempDesc[1]) : Paths.get(String.valueOf(new URL(textURL)))))
+                                            .relativize(Paths.get(".txt"))
+                            ))) {
                                 LOGGER.debug("Got description from " + textURL);
                                 saveText(new URL(textURL), "", tempDesc[0], textindex, (tempDesc.length > 1 ? tempDesc[1] : fileNameFromURL(new URL(textURL))));
                                 sleep(descSleepTime());
@@ -232,31 +230,31 @@ public abstract class AbstractHTMLRipper extends AbstractRipper {
      *      True if ripped successfully
      *      False if failed
      */
-    public boolean saveText(URL url, String subdirectory, String text, int index) {
+    public boolean saveText(URL url, String subdirectory, String text, int index) throws IOException {
         String saveAs = fileNameFromURL(url);
         return saveText(url,subdirectory,text,index,saveAs);
     }
-    private boolean saveText(URL url, String subdirectory, String text, int index, String fileName) {
+    private boolean saveText(URL url, String subdirectory, String text, int index, String fileName) throws IOException {
         // Not the best for some cases, like FurAffinity. Overridden there.
         try {
             stopCheck();
         } catch (IOException e) {
             return false;
         }
-        File saveFileAs;
+        Path saveFileAs;
         try {
-            if (!subdirectory.equals("")) { // Not sure about this part
-                subdirectory = File.separator + subdirectory;
+            if (subdirectory.equals(null)) {
+                subdirectory = "";
             }
-            saveFileAs = new File(
-                    workingDir.getCanonicalPath()
-                    + subdirectory
-                    + File.separator
-                    + getPrefix(index)
-                    + fileName
-                    + ".txt");
+            saveFileAs = Paths.get(
+                    workingDir.toString()
+                    , subdirectory
+                    , File.separator
+                    , getPrefix(index)
+                    , fileName
+                    , ".txt");
             // Write the file
-            FileOutputStream out = (new FileOutputStream(saveFileAs));
+            OutputStream out = Files.newOutputStream(saveFileAs);
             out.write(text.getBytes());
             out.close();
         } catch (IOException e) {
@@ -264,9 +262,9 @@ public abstract class AbstractHTMLRipper extends AbstractRipper {
             return false;
         }
         LOGGER.debug("Downloading " + url + "'s description to " + saveFileAs);
-        if (!saveFileAs.getParentFile().exists()) {
+        if (!Files.exists(saveFileAs.getParent())) {
             LOGGER.info("[+] Creating directory: " + Utils.removeCWD(saveFileAs.getParent()));
-            saveFileAs.getParentFile().mkdirs();
+            Files.createDirectory(saveFileAs.getParent());
         }
         return true;
     }
@@ -442,11 +440,6 @@ public abstract class AbstractHTMLRipper extends AbstractRipper {
     @Override
     public void setWorkingDir(URL url) throws IOException {
         Path wd = Utils.getWorkingDirectory();
-        // TODO - change to nio
-        String path = wd.toAbsolutePath().toString();
-        if (!path.endsWith(File.separator)) {
-            path += File.separator;
-        }
         String title;
         if (Utils.getConfigBoolean("album_titles.save", true)) {
             title = getAlbumTitle(this.url);
@@ -456,16 +449,12 @@ public abstract class AbstractHTMLRipper extends AbstractRipper {
         LOGGER.debug("Using album title '" + title + "'");
 
         title = Utils.filesystemSafe(title);
-        path += title;
-        path = Utils.getOriginalDirectory(path) + File.separator;   // check for case sensitive (unix only)
-
-        this.workingDir = new File(path);
-        if (!this.workingDir.exists()) {
-            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(this.workingDir.toPath()));
-            if (!this.workingDir.mkdirs()) {
-                throw new IOException("Failed creating dir: \"" + this.workingDir + "\"");
-            }
+        wd = wd.resolve(title);
+        if (!Files.exists(wd)) {
+            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(wd));
+            Files.createDirectory(wd);
         }
+        this.workingDir = wd;
         LOGGER.debug("Set working directory to: " + this.workingDir);
     }
 

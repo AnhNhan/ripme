@@ -192,7 +192,7 @@ public class EHentaiRipper extends AbstractHTMLRipper {
 
     @Override
     public void downloadURL(URL url, int index) {
-        EHentaiImageThread t = new EHentaiImageThread(url, index, this.workingDir.toPath());
+        EHentaiImageThread t = new EHentaiImageThread(url, index, this.workingDir);
         ehentaiThreadPool.addThread(t);
         try {
             Thread.sleep(IMAGE_SLEEP_TIME);

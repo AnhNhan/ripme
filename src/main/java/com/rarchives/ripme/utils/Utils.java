@@ -484,6 +484,7 @@ public class Utils {
      * @return a filesystem safe string
      */
     public static String filesystemSafe(String text) {
+        if (null == text) text = "";
         text = text.replaceAll("[^a-zA-Z0-9-.,_ ]", "");
         if (text.length() > 100) {
             text = text.substring(0, 99);

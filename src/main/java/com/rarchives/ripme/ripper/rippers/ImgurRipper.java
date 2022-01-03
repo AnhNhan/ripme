@@ -199,7 +199,7 @@ public class ImgurRipper extends AlbumRipper {
         ImgurAlbum album = getImgurAlbum(url);
         for (ImgurImage imgurImage : album.images) {
             stopCheck();
-            Path saveAs = workingDir.toPath();
+            Path saveAs = workingDir;
             if (subdirectory != null && !subdirectory.equals("")) {
                 saveAs.resolve(subdirectory);
             }

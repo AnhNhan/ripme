@@ -9,6 +9,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -84,22 +85,11 @@ public abstract class VideoRipper extends AbstractRipper {
      */
     @Override
     public void setWorkingDir(URL url) throws IOException {
-        Path wd = Utils.getWorkingDirectory();
-        // TODO - change to nio
-        String path = wd.toAbsolutePath().toString();
-
-        if (!path.endsWith(File.separator)) {
-            path += File.separator;
+        workingDir = Utils.getWorkingDirectory().resolve("videos");
+        if (!Files.exists(workingDir)) {
+            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(workingDir));
+            Files.createDirectory(workingDir);
         }
-
-        path += "videos" + File.separator;
-        workingDir = new File(path);
-
-        if (!workingDir.exists()) {
-            LOGGER.info("[+] Creating directory: " + Utils.removeCWD(workingDir.toPath()));
-            workingDir.mkdirs();
-        }
-
         LOGGER.debug("Set working directory to: " + workingDir);
     }
 

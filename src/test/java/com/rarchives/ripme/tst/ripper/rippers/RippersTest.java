@@ -56,7 +56,7 @@ public class RippersTest {
                 Assertions.fail("Failed to rip " + ripper.getURL() + " : " + e.getMessage());
             }
         } catch (Exception e) {
-            e.printStackTrace();
+             e.printStackTrace();
             Assertions.fail("Failed to rip " + ripper.getURL() + " : " + e.getMessage());
         } finally {
             deleteDir(ripper.getWorkingDir());

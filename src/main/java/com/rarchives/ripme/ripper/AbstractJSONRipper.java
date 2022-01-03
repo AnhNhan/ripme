@@ -41,7 +41,7 @@ public abstract class AbstractJSONRipper extends AbstractRipper {
         throw new IOException("getNextPage not implemented");
     }
     protected abstract List<String> getURLsFromJSON(JSONObject json);
-    protected abstract void downloadURL(URL url, int index);
+    protected abstract void downloadURL(URL url, int index) throws IOException;
     private DownloadThreadPool getThreadPool() {
         return null;
     }
@@ -293,8 +293,8 @@ public abstract class AbstractJSONRipper extends AbstractRipper {
         if (!Files.exists(wd)) {
             LOGGER.info("[+] Creating directory: " + Utils.removeCWD(wd));
             Files.createDirectory(wd);
-            this.workingDir = wd.toFile();
         }
+        this.workingDir = wd;
         LOGGER.debug("Set working directory to: " + this.workingDir);
     }
 
