@@ -110,7 +110,7 @@ public class Utils {
      * @return Root directory to save rips to.
      */
     public static Path getWorkingDirectory() throws IOException {
-        String currentDir = getJarDirectory() + File.separator + RIP_DIRECTORY + File.separator;
+        String currentDir = getJarDirectory() + "/" + RIP_DIRECTORY + "/";
 
         if (config != null) {
             currentDir = getConfigString("rips.directory", currentDir);
@@ -217,22 +217,21 @@ public class Utils {
      * Gets the directory of where the config file is stored on a Windows machine.
      */
     private static String getWindowsConfigDir() {
-        return System.getenv("LOCALAPPDATA") + File.separator + "ripme";
+        return System.getenv("LOCALAPPDATA") + "/ripme";
     }
 
     /**
      * Gets the directory of where the config file is stored on a UNIX machine.
      */
     private static String getUnixConfigDir() {
-        return System.getProperty("user.home") + File.separator + ".config" + File.separator + "ripme";
+        return System.getProperty("user.home")  + "/.config/ripme";
     }
 
     /**
      * Gets the directory of where the config file is stored on a Mac machine.
      */
     private static String getMacOSConfigDir() {
-        return System.getProperty("user.home") + File.separator + "Library" + File.separator + "Application Support"
-                + File.separator + "ripme";
+        return System.getProperty("user.home")  + "/Library/Application Support/ripme";
     }
 
     private static Path getJarDirectory() {
@@ -301,7 +300,7 @@ public class Utils {
      */
     public static String getURLHistoryFile() {
         if (getConfigString("history.location", "").length() == 0) {
-            return getConfigDir() + File.separator + "url_history.txt";
+            return getConfigDir() + "/url_history.txt";
         } else {
             return getConfigString("history.location", "");
         }
@@ -311,7 +310,7 @@ public class Utils {
      * Gets the path to the configuration file.
      */
     private static String getConfigFilePath() {
-        return getConfigDir() + File.separator + CONFIG_FILE;
+        return getConfigDir() + "/" + CONFIG_FILE;
     }
 
     /**
@@ -383,10 +382,10 @@ public class Utils {
         }
 
         String fullPath = resource.getFile();
-        File directory;
+        Path directory;
 
         try {
-            directory = new File(resource.toURI());
+            directory = Paths.get(resource.toURI());
         } catch (URISyntaxException e) {
             throw new RuntimeException(
                     pkgname + " (" + resource
@@ -396,9 +395,10 @@ public class Utils {
             directory = null;
         }
 
-        if (directory != null && directory.exists()) {
+        File d = directory.toFile();
+        if (Files.exists(directory)) {
             // Get the list of the files contained in the package
-            String[] files = directory.list();
+            String[] files = d.list();
             assert files != null;
             for (String file : files) {
                 if (file.endsWith(".class") && !file.contains("$")) {
@@ -448,7 +448,7 @@ public class Utils {
      * @return The simplified path to the file.
      */
     public static String shortenPath(String path) {
-        return shortenPath(new File(path));
+        return shortenPath(Paths.get(path));
     }
 
     /**
@@ -457,8 +457,8 @@ public class Utils {
      * @param file File object that you want the shortened path of.
      * @return The simplified path to the file.
      */
-    public static String shortenPath(File file) {
-        String path = removeCWD(file.toPath());
+    public static String shortenPath(Path file) {
+        String path = removeCWD(file);
         if (path.length() < SHORTENED_PATH_LENGTH * 2) {
             return path;
         }
@@ -520,7 +520,7 @@ public class Utils {
         for (String name : names) {
             if (name.toLowerCase().equals(lastPart)) {
                 // Building Path of existing file
-                return path.substring(0, index) + File.separator + name;
+                return path.substring(0, index) + "/" + name;
             }
         }
 
@@ -857,7 +857,7 @@ public class Utils {
     public static Path shortenSaveAsWindows(String ripsDirPath, String fileName) throws FileNotFoundException {
         LOGGER.error("The filename " + fileName + " is to long to be saved on this file system.");
         LOGGER.info("Shortening filename");
-        String fullPath = ripsDirPath + File.separator + fileName;
+        String fullPath = ripsDirPath + "/" + fileName;
         // How long the path without the file name is
         int pathLength = ripsDirPath.length();
         if (pathLength == 260) {

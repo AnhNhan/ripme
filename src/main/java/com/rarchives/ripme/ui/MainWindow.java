@@ -1441,7 +1441,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             statusProgress.setVisible(false);
             openButton.setVisible(true);
             Path f = rsc.dir;
-            String prettyFile = Utils.shortenPath(f.toFile());
+            String prettyFile = Utils.shortenPath(f);
             openButton.setText(Utils.getLocalizedString("open") + prettyFile);
             mainFrame.setTitle("RipMe v" + UpdateUtils.getThisJarVersion());
             try {
