@@ -13,7 +13,6 @@ import org.jsoup.HttpStatusException;
 import java.awt.*;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -22,6 +21,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -83,42 +83,25 @@ public abstract class AbstractRipper
         BufferedWriter bw = null;
         FileWriter fw = null;
         try {
-            File file = new File(URLHistoryFile);
-            if (!new File(Utils.getConfigDir()).exists()) {
-                LOGGER.error("Config dir doesn't exist");
-                LOGGER.info("Making config dir");
-                boolean couldMakeDir = new File(Utils.getConfigDir()).mkdirs();
-                if (!couldMakeDir) {
-                    LOGGER.error("Couldn't make config dir");
-                    return;
-                }
+            Path file = Paths.get(URLHistoryFile);
+            if (!Files.exists(Paths.get(Utils.getConfigDir()))) {
+                LOGGER.error("Config dir doesn't exist, making it.");
+                Files.createDirectory(Paths.get(Utils.getConfigDir()));
             }
             // if file doesnt exists, then create it
-            if (!file.exists()) {
-                boolean couldMakeDir = file.createNewFile();
-                if (!couldMakeDir) {
-                    LOGGER.error("Couldn't url history file");
-                    return;
-                }
+            if (!Files.exists(file)) {
+                Files.createFile(file);
             }
-            if (!file.canWrite()) {
+            if (!Files.isWritable(file)) {
                 LOGGER.error("Can't write to url history file: " + URLHistoryFile);
                 return;
             }
-            fw = new FileWriter(file.getAbsoluteFile(), true);
-            bw = new BufferedWriter(fw);
-            bw.write(downloadedURL);
+            Files.write(
+                    file,
+                    downloadedURL.getBytes(),
+                    StandardOpenOption.APPEND);
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            try {
-                if (bw != null)
-                    bw.close();
-                if (fw != null)
-                    fw.close();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
         }
     }
 
@@ -139,7 +122,7 @@ public abstract class AbstractRipper
      *      Returns false if not yet downloaded.
      */
     protected boolean hasDownloadedURL(String url) {
-        File file = new File(URLHistoryFile);
+        Path file = Paths.get(URLHistoryFile);
         url = normalizeUrl(url);
 
         try (Scanner scanner = new Scanner(file)) {
@@ -149,7 +132,7 @@ public abstract class AbstractRipper
                     return true;
                 }
             }
-        } catch (FileNotFoundException e) {
+        } catch (Exception e) {
             return false;
         }
 
@@ -493,9 +476,9 @@ public abstract class AbstractRipper
 //            ctx.reconfigure();
 
             if (Utils.getConfigBoolean("urls_only.save", false)) {
-                String urlFile = this.workingDir + File.separator + "urls.txt";
+                String urlFile = this.workingDir + "/urls.txt";
                 try {
-                    Desktop.getDesktop().open(new File(urlFile));
+                    Desktop.getDesktop().open(Paths.get(urlFile).toFile());
                 } catch (IOException e) {
                     LOGGER.warn("Error while opening " + urlFile, e);
                 }
