@@ -31,7 +31,6 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -891,10 +890,10 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             if (returnVal != JFileChooser.APPROVE_OPTION) {
                 return;
             }
-            File chosenFile = jfc.getSelectedFile();
+            Path chosenFile = jfc.getSelectedFile().toPath();
             String chosenPath = null;
             try {
-                chosenPath = chosenFile.getCanonicalPath();
+                chosenPath = chosenFile.toAbsolutePath().toString();
             } catch (Exception e) {
                 LOGGER.error("Error while getting selected path: ", e);
                 return;
@@ -915,10 +914,10 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             if (returnVal != JFileChooser.APPROVE_OPTION) {
                 return;
             }
-            File chosenFile = jfc.getSelectedFile();
+            Path chosenFile = jfc.getSelectedFile().toPath();
             String chosenPath = null;
             try {
-                chosenPath = chosenFile.getCanonicalPath();
+                chosenPath = chosenFile.toAbsolutePath().toString();
             } catch (Exception e) {
                 LOGGER.error("Error while getting selected path: ", e);
                 return;
@@ -1155,12 +1154,12 @@ public final class MainWindow implements Runnable, RipStatusHandler {
     }
 
     private void loadHistory() throws IOException {
-        File historyFile = new File(Utils.getConfigDir() + File.separator + "history.json");
+        Path historyFile = Paths.get(Utils.getConfigDir() + "/history.json");
         HISTORY.clear();
-        if (historyFile.exists()) {
+        if (Files.exists(historyFile)) {
             try {
-                LOGGER.info(Utils.getLocalizedString("loading.history.from") + " " + historyFile.getCanonicalPath());
-                HISTORY.fromFile(historyFile.getCanonicalPath());
+                LOGGER.info(Utils.getLocalizedString("loading.history.from") + " " + historyFile.toAbsolutePath().toString());
+                HISTORY.fromFile(historyFile.toAbsolutePath().toString());
             } catch (IOException e) {
                 LOGGER.error("Failed to load history from file " + historyFile, e);
                 JOptionPane.showMessageDialog(null,
@@ -1191,7 +1190,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
     }
 
     private void saveHistory() {
-        Path historyFile = Paths.get(Utils.getConfigDir() + File.separator + "history.json");
+        Path historyFile = Paths.get(Utils.getConfigDir() + "/history.json");
         try {
             if (!Files.exists(historyFile)) {
                 Files.createDirectories(historyFile.getParent());
@@ -1488,7 +1487,7 @@ public final class MainWindow implements Runnable, RipStatusHandler {
             openButton.setActionCommand(f.toString());
             openButton.addActionListener(event -> {
                 try {
-                    Desktop.getDesktop().open(new File(event.getActionCommand()));
+                    Desktop.getDesktop().open(Paths.get(event.getActionCommand()).toFile());
                 } catch (Exception e) {
                     LOGGER.error(e);
                 }

@@ -4,7 +4,6 @@ import com.rarchives.ripme.ui.RipStatusMessage;
 import com.rarchives.ripme.ui.RipStatusMessage.STATUS;
 import com.rarchives.ripme.utils.Utils;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -24,7 +23,7 @@ import java.util.Map;
  */
 public abstract class AlbumRipper extends AbstractRipper {
 
-    private Map<URL, File> itemsPending = Collections.synchronizedMap(new HashMap<URL, File>());
+    private Map<URL, Path> itemsPending = Collections.synchronizedMap(new HashMap<URL, Path>());
     private Map<URL, Path> itemsCompleted = Collections.synchronizedMap(new HashMap<URL, Path>());
     private Map<URL, String> itemsErrored = Collections.synchronizedMap(new HashMap<URL, String>());
 
@@ -81,7 +80,7 @@ public abstract class AlbumRipper extends AbstractRipper {
             }
         }
         else {
-            itemsPending.put(url, saveAs.toFile());
+            itemsPending.put(url, saveAs);
             DownloadFileThread dft = new DownloadFileThread(url,  saveAs.toFile(),  this, getFileExtFromMIME);
             if (referrer != null) {
                 dft.setReferrer(referrer);

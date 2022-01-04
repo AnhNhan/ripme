@@ -4,7 +4,6 @@ import com.rarchives.ripme.ui.RipStatusMessage;
 import com.rarchives.ripme.ui.RipStatusMessage.STATUS;
 import com.rarchives.ripme.utils.Utils;
 
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;

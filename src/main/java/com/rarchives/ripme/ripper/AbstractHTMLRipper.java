@@ -6,8 +6,6 @@ import com.rarchives.ripme.ui.RipStatusMessage.STATUS;
 import com.rarchives.ripme.utils.Utils;
 import org.jsoup.nodes.Document;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
@@ -28,7 +26,7 @@ import java.util.Map;
  */
 public abstract class AbstractHTMLRipper extends AbstractRipper {
     
-    private final Map<URL, File> itemsPending = Collections.synchronizedMap(new HashMap<>());
+    private final Map<URL, Path> itemsPending = Collections.synchronizedMap(new HashMap<>());
     private final Map<URL, Path> itemsCompleted = Collections.synchronizedMap(new HashMap<>());
     private final Map<URL, String> itemsErrored = Collections.synchronizedMap(new HashMap<>());
 
@@ -249,7 +247,7 @@ public abstract class AbstractHTMLRipper extends AbstractRipper {
             saveFileAs = Paths.get(
                     workingDir.toString()
                     , subdirectory
-                    , File.separator
+                    , "/"
                     , getPrefix(index)
                     , fileName
                     , ".txt");
@@ -332,7 +330,7 @@ public abstract class AbstractHTMLRipper extends AbstractRipper {
             }
         }
         else {
-            itemsPending.put(url, saveAs.toFile());
+            itemsPending.put(url, saveAs);
             DownloadFileThread dft = new DownloadFileThread(url,  saveAs.toFile(),  this, getFileExtFromMIME);
             if (referrer != null) {
                 dft.setReferrer(referrer);
