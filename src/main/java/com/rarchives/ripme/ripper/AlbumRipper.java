@@ -81,7 +81,7 @@ public abstract class AlbumRipper extends AbstractRipper {
         }
         else {
             itemsPending.put(url, saveAs);
-            DownloadFileThread dft = new DownloadFileThread(url,  saveAs.toFile(),  this, getFileExtFromMIME);
+            DownloadFileThread dft = new DownloadFileThread(url,  saveAs,  this, getFileExtFromMIME);
             if (referrer != null) {
                 dft.setReferrer(referrer);
             }

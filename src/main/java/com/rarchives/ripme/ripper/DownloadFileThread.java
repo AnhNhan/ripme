@@ -6,6 +6,7 @@ import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,7 +34,7 @@ class DownloadFileThread extends Thread {
     private Map<String, String> cookies = new HashMap<>();
 
     private URL url;
-    private File saveAs;
+    private Path saveAs;
     private String prettySaveAs;
     private AbstractRipper observer;
     private int retries;
@@ -41,11 +42,11 @@ class DownloadFileThread extends Thread {
 
     private final int TIMEOUT;
 
-    public DownloadFileThread(URL url, File saveAs, AbstractRipper observer, Boolean getFileExtFromMIME) {
+    public DownloadFileThread(URL url, Path saveAs, AbstractRipper observer, Boolean getFileExtFromMIME) {
         super();
         this.url = url;
         this.saveAs = saveAs;
-        this.prettySaveAs = Utils.removeCWD(saveAs.toPath());
+        this.prettySaveAs = Utils.removeCWD(saveAs);
         this.observer = observer;
         this.retries = Utils.getConfigInteger("download.retries", 1);
         this.TIMEOUT = Utils.getConfigInteger("download.timeout", 60000);
@@ -66,13 +67,17 @@ class DownloadFileThread extends Thread {
      */
     public void run() {
         // First thing we make sure the file name doesn't have any illegal chars in it
-        saveAs = new File(
-                saveAs.getParentFile().getAbsolutePath() + File.separator + Utils.sanitizeSaveAs(saveAs.getName()));
+        saveAs = Paths.get(
+                saveAs.getParent().toAbsolutePath() + "/" + Utils.sanitizeSaveAs(saveAs.getFileName().toString()));
         long fileSize = 0;
         int bytesTotal = 0;
         int bytesDownloaded = 0;
-        if (saveAs.exists() && observer.tryResumeDownload()) {
-            fileSize = saveAs.length();
+        if (Files.exists(saveAs) && observer.tryResumeDownload()) {
+            try {
+                fileSize = Files.size(saveAs);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         try {
             observer.stopCheck();
@@ -80,16 +85,20 @@ class DownloadFileThread extends Thread {
             observer.downloadErrored(url, Utils.getLocalizedString("download.interrupted"));
             return;
         }
-        if (saveAs.exists() && !observer.tryResumeDownload() && !getFileExtFromMIME
-                || Utils.fuzzyExists(Paths.get(saveAs.getParent()), saveAs.getName()) && getFileExtFromMIME
+        if (Files.exists(saveAs) && !observer.tryResumeDownload() && !getFileExtFromMIME
+                || Utils.fuzzyExists(Paths.get(saveAs.getParent().toString()), saveAs.getFileName().toString()) && getFileExtFromMIME
                         && !observer.tryResumeDownload()) {
             if (Utils.getConfigBoolean("file.overwrite", false)) {
                 logger.info("[!] " + Utils.getLocalizedString("deleting.existing.file") + prettySaveAs);
-                saveAs.delete();
+                try {
+                    Files.delete(saveAs);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             } else {
                 logger.info("[!] " + Utils.getLocalizedString("skipping") + " " + url + " -- "
                         + Utils.getLocalizedString("file.already.exists") + ": " + prettySaveAs);
-                observer.downloadExists(url, saveAs.toPath());
+                observer.downloadExists(url, saveAs);
                 return;
             }
         }
@@ -141,7 +150,7 @@ class DownloadFileThread extends Thread {
                 int statusCode = huc.getResponseCode();
                 logger.debug("Status code: " + statusCode);
                 // If the server doesn't allow resuming downloads error out
-                if (statusCode != 206 && observer.tryResumeDownload() && saveAs.exists()) {
+                if (statusCode != 206 && observer.tryResumeDownload() && Files.exists(saveAs)) {
                     // TODO find a better way to handle servers that don't support resuming
                     // downloads then just erroring out
                     throw new IOException(Utils.getLocalizedString("server.doesnt.support.resuming.downloads"));
@@ -194,7 +203,7 @@ class DownloadFileThread extends Thread {
                     String fileExt = URLConnection.guessContentTypeFromStream(bis);
                     if (fileExt != null) {
                         fileExt = fileExt.replaceAll("image/", "");
-                        saveAs = new File(saveAs.toString() + "." + fileExt);
+                        saveAs = Paths.get(saveAs.toString() + "." + fileExt);
                     } else {
                         logger.error("Was unable to get content type from stream");
                         // Try to get the file type from the magic number
@@ -203,7 +212,7 @@ class DownloadFileThread extends Thread {
                         bis.reset();
                         fileExt = Utils.getEXTFromMagic(magicBytes);
                         if (fileExt != null) {
-                            saveAs = new File(saveAs.toString() + "." + fileExt);
+                            saveAs = Paths.get(saveAs.toString() + "." + fileExt);
                         } else {
                             logger.error(Utils.getLocalizedString("was.unable.to.get.content.type.using.magic.number"));
                             logger.error(
@@ -213,33 +222,33 @@ class DownloadFileThread extends Thread {
                 }
                 // If we're resuming a download we append data to the existing file
                 if (statusCode == 206) {
-                    fos = new FileOutputStream(saveAs, true);
+                    fos = new FileOutputStream(String.valueOf(saveAs), true);
                 } else {
                     try {
-                        fos = new FileOutputStream(saveAs);
+                        fos = Files.newOutputStream(saveAs);
                     } catch (FileNotFoundException e) {
                         // We do this because some filesystems have a max name length
                         if (e.getMessage().contains("File name too long")) {
-                            logger.error("The filename " + saveAs.getName()
+                            logger.error("The filename " + saveAs.getFileName()
                                     + " is to long to be saved on this file system.");
                             logger.info("Shortening filename");
-                            String[] saveAsSplit = saveAs.getName().split("\\.");
+                            String[] saveAsSplit = saveAs.getFileName().toString().split("\\.");
                             // Get the file extension so when we shorten the file name we don't cut off the
                             // file extension
                             String fileExt = saveAsSplit[saveAsSplit.length - 1];
                             // The max limit for filenames on Linux with Ext3/4 is 255 bytes
-                            logger.info(saveAs.getName().substring(0, 254 - fileExt.length()) + fileExt);
-                            String filename = saveAs.getName().substring(0, 254 - fileExt.length()) + "." + fileExt;
+                            logger.info(saveAs.getFileName().toString().substring(0, 254 - fileExt.length()) + fileExt);
+                            String filename = saveAs.getFileName().toString().substring(0, 254 - fileExt.length()) + "." + fileExt;
                             // We can't just use the new file name as the saveAs because the file name
                             // doesn't include the
                             // users save path, so we get the user save path from the old saveAs
-                            saveAs = new File(saveAs.getParentFile().getAbsolutePath() + File.separator + filename);
-                            fos = new FileOutputStream(saveAs);
-                        } else if (saveAs.getAbsolutePath().length() > 259 && Utils.isWindows()) {
+                            saveAs = Paths.get(saveAs.getParent().toAbsolutePath() + "/" + filename);
+                            fos = Files.newOutputStream(saveAs);
+                        } else if (saveAs.toAbsolutePath().toString().length() > 259 && Utils.isWindows()) {
                             // This if is for when the file path has gone above 260 chars which windows does
                             // not allow
                             fos = Files.newOutputStream(
-                                    Utils.shortenSaveAsWindows(saveAs.getParentFile().getPath(), saveAs.getName()));
+                                    Utils.shortenSaveAsWindows(saveAs.getParent().toString(), saveAs.getFileName().toString()));
                         }
                     }
                 }
@@ -315,7 +324,7 @@ class DownloadFileThread extends Thread {
                 return;
             }
         } while (true);
-        observer.downloadCompleted(url, saveAs.toPath());
+        observer.downloadCompleted(url, saveAs);
         logger.info("[+] Saved " + url + " as " + this.prettySaveAs);
     }
 
