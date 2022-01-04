@@ -12,7 +12,6 @@ import org.jsoup.HttpStatusException;
 
 import java.awt.*;
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -500,8 +499,8 @@ public abstract class AbstractRipper
      *      Path to the directory in which all files
      *      ripped via this ripper will be stored.
      */
-    public File getWorkingDir() {
-        return workingDir.toFile();
+    public Path getWorkingDir() {
+        return workingDir;
     }
 
     @Override

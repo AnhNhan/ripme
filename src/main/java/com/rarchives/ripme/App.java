@@ -107,7 +107,7 @@ public class App {
         } else {
             HistoryEntry entry = new HistoryEntry();
             entry.url = u;
-            entry.dir = ripper.getWorkingDir().getAbsolutePath();
+            entry.dir = ripper.getWorkingDir().toAbsolutePath().toString();
             try {
                 entry.title = ripper.getAlbumTitle(ripper.getURL());
             } catch (MalformedURLException ignored) { }
